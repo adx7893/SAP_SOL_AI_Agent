@@ -1,0 +1,60 @@
+apiVersion: v1
+kind: Secret
+metadata:
+  name: groq-api-secret
+type: Opaque
+stringData:
+  GROQ_API_KEY: "REPLACE_WITH_YOUR_REAL_GROQ_KEY_Because_We_Should_Not_Give_API_Keys_In_Code"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: sap-sol-app
+  labels:
+    app: sap-sol-app
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: sap-sol-app
+  template:
+    metadata:
+      labels:
+        app: sap-sol-app
+    spec:
+      containers:
+        - name: laravel-app
+          image: apurva19989432/hackathon-sap-sol-laravel:latest
+          ports:
+            - containerPort: 8000
+          env:
+            - name: APP_ENV
+              value: "production"
+            - name: APP_DEBUG
+              value: "false"
+            # Laravel uses this to call the agent
+            - name: AGENT_URL
+              value: "http://localhost:9000"
+        - name: agent-service
+          image: apurva19989432/hackathon-sap-sol-agent:latest
+          ports:
+            - containerPort: 9000
+          env:
+            - name: GROQ_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: groq-api-secret
+                  key: GROQ_API_KEY
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: sap-sol-service
+spec:
+  type: LoadBalancer
+  selector:
+    app: sap-sol-app
+  ports:
+    - name: http
+      port: 80        # external port on cluster
+      targetPort: 8000  # Laravel container port
