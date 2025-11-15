@@ -1,59 +1,144 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+Overview
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+This project implements an AI agent pipeline that analyzes a candidate résumé and classifies the most relevant SAP module role (MM, SD, FICO, PM, Basis).
+It also generates:
 
-## About Laravel
+A clean candidate summary
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+One recommended SAP role
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+Three SAP skill gaps
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+Three actionable learning tips
 
-## Learning Laravel
+Full reasoning logs stored in DB
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework. You can also check out [Laravel Learn](https://laravel.com/learn), where you will be guided through building a modern Laravel application.
+The system uses Laravel 12, FastAPI, LangChain, Groq Llama-3.3, Docker, and Kubernetes.
 
-If you don't feel like reading, [Laracasts](https://laracasts.com) can help. Laracasts contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
+Architecture
 
-## Laravel Sponsors
+User
+→ POST /api/resume (PDF/DOC/TXT)
+→ Laravel API
+→ Stores file and extracts text
+→ Logs reasoning steps
+→ Calls agent /match
+→ Python Agent Service
+→ Llama model returns JSON
+→ Laravel returns final structured output
+→ Client receives JSON
 
-We would like to extend our thanks to the following sponsors for funding Laravel development. If you are interested in becoming a sponsor, please visit the [Laravel Partners program](https://partners.laravel.com).
+Project Structure
 
-### Premium Partners
+hackathon-sap-sol/
 
-- **[Vehikl](https://vehikl.com)**
-- **[Tighten Co.](https://tighten.co)**
-- **[Kirschbaum Development Group](https://kirschbaumdevelopment.com)**
-- **[64 Robots](https://64robots.com)**
-- **[Curotec](https://www.curotec.com/services/technologies/laravel)**
-- **[DevSquad](https://devsquad.com/hire-laravel-developers)**
-- **[Redberry](https://redberry.international/laravel-development)**
-- **[Active Logic](https://activelogic.com)**
+laravel/ (Laravel API project)
 
-## Contributing
+agent-service/venv/ (Python FastAPI LangChain agent)
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+docker-compose.yml
 
-## Code of Conduct
+k8s.yaml
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+README.md
 
-## Security Vulnerabilities
+Setup Instructions
 
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+Clone the project
+git clone https://github.com/
+<your-repo>/hackathon-sap-sol.git
+cd hackathon-sap-sol
 
-## License
+Laravel API Setup (Local)
 
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+Copy .env file
+cp .env.example .env
+
+Use SQLite
+DB_CONNECTION=sqlite
+Create the DB file:
+mkdir -p database
+touch database/database.sqlite
+
+Install dependencies and migrate
+composer install
+php artisan key:generate
+php artisan migrate
+
+Start Laravel
+php artisan serve --host=0.0.0.0 --port=8000
+
+Python Agent Microservice Setup
+
+cd agent-service/venv
+pip install -r requirements.txt
+export GROQ_API_KEY="your_real_key"
+uvicorn main:app --host 0.0.0.0 --port=9000
+
+API Endpoints
+
+POST /api/resume
+Uploads file + triggers agent pipeline
+
+POST /api/match
+Only runs the Llama agent manually
+
+Example Response:
+
+{
+"resume_id": 1,
+"candidate_summary": "...",
+"suggested_role": "SD",
+"skill_gaps": ["...", "...", "..."],
+"learning_tips": ["...", "...", "..."]
+}
+
+Logs stored in:
+storage/logs/laravel.log
+agent_logs table
+
+Docker Setup
+
+Build Laravel image:
+docker build -f Dockerfile.laravel -t apurva19989432/hackathon-sap-sol-laravel:latest .
+
+Build agent image:
+docker build -f agent-service/venv/Dockerfile.agent -t apurva19989432/hackathon-sap-sol-agent:latest agent-service/venv
+
+Push images:
+docker push apurva19989432/hackathon-sap-sol-laravel:latest
+docker push apurva19989432/hackathon-sap-sol-agent:latest
+
+Run via Docker Compose:
+docker compose up
+
+Laravel runs on: http://localhost:8000
+
+Agent runs on: http://localhost:9000
+
+Kubernetes Deployment
+
+kubectl apply -f k8s.yaml
+kubectl get pods
+kubectl get svc
+
+Test endpoint after ingress load balancer:
+curl -X POST http://<EXTERNAL-IP>/api/resume -F "resume=@file.pdf"
+
+Logging and Reasoning
+
+Laravel logs agent steps:
+storage/logs/laravel.log
+
+Database:
+agent_logs table logs all steps:
+
+step
+
+tool
+
+input
+
+output
+
+timestamp
