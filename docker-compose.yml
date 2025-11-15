@@ -1,0 +1,29 @@
+version: "3.9"
+
+services:
+  laravel:
+    build:
+      context: .
+      dockerfile: Dockerfile.laravel
+    container_name: laravel-app
+    ports:
+      - "8000:8000"
+    environment:
+      APP_ENV: local
+      APP_DEBUG: "true"
+      APP_URL: http://localhost:8000
+      # Point Laravel to the agent service inside Docker network
+      AGENT_URL: http://agent:9000
+    depends_on:
+      - agent
+
+  agent:
+    build:
+      context: ./agent-service/venv
+      dockerfile: Dockerfile.agent
+    container_name: agent-service
+    ports:
+      - "9000:9000"
+    environment:
+      # 👇 Replace with your real Groq key or use an env file
+      GROQ_API_KEY: "gsk_your_real_key_here"

@@ -1,0 +1,32 @@
+# Use PHP CLI image
+FROM php:8.3-cli
+
+# Install system dependencies & SQLite extension
+RUN apt-get update && apt-get install -y \
+    git \
+    unzip \
+    libzip-dev \
+    libsqlite3-dev \
+    zlib1g-dev \
+ && docker-php-ext-configure pdo_sqlite --with-pdo-sqlite=/usr \
+ && docker-php-ext-install pdo pdo_sqlite \
+ && rm -rf /var/lib/apt/lists/*
+
+# Install Composer (copy from official composer image)
+COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
+
+# Set working directory inside the container
+WORKDIR /var/www
+
+# Copy the whole Laravel project into the image
+# (this includes artisan, composer.json, app/, routes/, etc.)
+COPY . .
+
+# Install PHP dependencies
+RUN composer install --no-dev --no-interaction --optimize-autoloader
+
+# Expose Laravel dev server port
+EXPOSE 8000
+
+# Default command: run Laravel's dev server
+CMD ["php", "artisan", "serve", "--host=0.0.0.0", "--port=8000"]
